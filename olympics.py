@@ -4,12 +4,13 @@ from os.path import exists
 from pywikibot.page import Page
 
 # Variables
-summer		= 'verano'
-winter		= 'invierno'
-tableModule	= 'Módulo:Ficha de país en los Juegos Olímpicos/datos'
-site		= pywikibot.Site('wikipedia:es')
+summer		= os.environ['SUMMER'] or 'verano'
+winter		= os.environ['WINTER'] or 'invierno'
+tableModule	= os.environ['MODULE'] or 'Módulo:Ficha de país en los Juegos Olímpicos/datos'
+siteValue	= os.environ['SITE']   or 'wikipedia:es'
 
 # Setup
+site		= pywikibot.Site(siteValue)
 repo = site.data_repository()
 
 # Query
