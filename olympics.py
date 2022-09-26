@@ -131,6 +131,6 @@ wholeDataModuleObj = Page(site,tableModule + '/' + k)
 wholeDataModuleObj.text='return ' + luadata.serialize(v, encoding="utf-8", indent="\t")
 wholeDataModuleObj.save("test (using [[mw:Special:MyLanguage/Manual:Pywikibot|pywikibot]])")
 
-participedDataModuleObj = Page(site, wholeDataModule)
+participedDataModuleObj = Page(site, participedDataModule)
 participedDataModuleObj.text='return ' + luadata.serialize(participedData, encoding="utf-8", indent="\t")
 participedDataModuleObj.save("test (using [[mw:Special:MyLanguage/Manual:Pywikibot|pywikibot]])")
