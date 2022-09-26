@@ -4,16 +4,18 @@ from os.path import exists
 from pywikibot.page import Page
 
 # Variables
-summer		= os.environ['SUMMER'] or 'verano'
-winter		= os.environ['WINTER'] or 'invierno'
-tableModule	= os.environ['MODULE'] or 'Módulo:Ficha de país en los Juegos Olímpicos/datos'
-siteValue	= os.environ['SITE']   or 'wikipedia:es'
+site					= pywikibot.Site('wikipedia:es')
+wiki					= 'eswiki'
+wholeDataModule			= 'Módulo:Ficha de país en los Juegos Olímpicos/datos'
+participedDataModule	= 'Módulo:Ficha de país en los Juegos Olímpicos/participaciones'
 
-# Setup
-site		= pywikibot.Site(siteValue)
+# Localisation
+summer	= 'verano'
+winter	= 'invierno'
+at		= ' en los '
+
 repo = site.data_repository()
 
-# Query
 url = 'https://query.wikidata.org/sparql'
 query = """SELECT DISTINCT ?item WHERE {
 	?item p:P31 ?statement0.
@@ -24,9 +26,14 @@ parsed = []
 data = r.json()
 data = data['results']['bindings']
 
-# Parse
-result = {}
+wholeData		= {}
+participedData	= {}
+
+count = 0
 for f in data:
+#	if count > 10:
+#		break
+	print(count)
 	value = {}
 	itemID = f['item']['value'].replace('http://www.wikidata.org/entity/', '')
 
@@ -35,32 +42,42 @@ for f in data:
 
 	# Sitelink
 	if item.sitelinks:
-		if 'eswiki' in item.sitelinks:
-			value['sitelink'] = item.sitelinks['eswiki'].toJSON()['title']
+		if wiki in item.sitelinks:
+			value['sitelink'] = item.sitelinks[wiki].toJSON()['title']
 
 			# Country
 			if 'P17' in item.claims:
-				if 'P984' in item.claims['P17'][0].getTarget().claims:
+				if 'P984' in item.claims['P17'][0].getTarget().claims and wiki in item.claims['P17'][0].getTarget().sitelinks:
 					ICO = item.claims['P17'][0].getTarget().claims['P984'][0].toJSON()['mainsnak']['datavalue']['value']
+					countryID = 'Q' + str(item.claims['P17'][0].toJSON()['mainsnak']['datavalue']['value']['numeric-id'])
+					countryTitle = item.claims['P17'][0].getTarget().sitelinks[wiki].toJSON()['title']
 
 					# Participed in (P1334)
 					if item.claims:
 						if 'P1344' in item.claims:
-							participedIn = item.claims['P1344'][0].getTarget().claims
+							participedInObj = item.claims['P1344'][0].getTarget().claims
+							if wiki in item.claims['P1344'][0].getTarget().sitelinks:
+								participedIn    = item.claims['P1344'][0].getTarget().sitelinks[wiki].toJSON()['title']
 
 							# Participed in -> Date (P585) (year)
-							if 'P585' in participedIn:
-								year = participedIn['P585'][-1].getTarget().year
+							if 'P585' in participedInObj:
+								year = participedInObj['P585'][-1].getTarget().year
 
 								# Participed in -> Instance of (P31)
-								if 'P31' in participedIn:
-									eventClassID = participedIn['P31'][0].toJSON()['mainsnak']['datavalue']['value']['numeric-id']
+								if 'P31' in participedInObj:
+									eventClassID = participedInObj['P31'][0].toJSON()['mainsnak']['datavalue']['value']['numeric-id']
 									if eventClassID == 159821:
 										eventClass = summer + ' ' + str(year)
+										eventClassKey = 0
 									elif eventClassID == 82414:
 										eventClass = winter + ' ' + str(year)
+										eventClassKey = 1
 									else:
-										continue
+										eventClassKey = 2
+
+									# ICO
+									if ICO:
+										value['ICO'] = ICO
 
 									# Flag -> P18 or P41
 									if 'P18' in item.claims: # item
@@ -80,20 +97,40 @@ for f in data:
 
 									# Delegation (pending until property creation)
 									if 'PXX' in item.claims: # item
-										value['delegation'] = item.claims['PXX'][0].getTarget().sitelinks['eswiki'].toJSON()['title']
+										value['delegation'] = item.claims['PXX'][0].getTarget().sitelinks[wiki].toJSON()['title']
 									elif 'P179' in item.claims: # series
 										if 'PXX' in item.claims['P179'][0].getTarget().claims:
-											value['delegation'] =   item.claims['P179'][0].getTarget().claims['PXX'][0].getTarget().sitelinks['eswiki'].toJSON()['title']
+											value['delegation'] =   item.claims['P179'][0].getTarget().claims['PXX'][0].getTarget().sitelinks[wiki].toJSON()['title']
 
-									if not ICO in result:
-										result[ICO] = {}
+									# Set tables
+									if not ICO in wholeData:
+										wholeData[countryID] = {}
 
-									if not eventClass in result[ICO]:
-										result[ICO][eventClass] = {}
+									if not countryID in participedData:
+										participedData[countryID] = {}
+										participedData[countryID][0] = []
+										participedData[countryID][1] = []
+										participedData[countryID][2] = []
 
-									result[ICO][eventClass] = value
+									if not eventClass in wholeData[countryID]:
+										wholeData[countryID][eventClass] = {}
 
-# Edit module
-Module = Page(site,tableModule)
-Module.text = 'return ' + luadata.serialize(result, encoding="utf-8", indent="\t")
-Module.save("test (using [[mw:Special:MyLanguage/Manual:Pywikibot|pywikibot]])")
+									# Fill final tables
+									wholeData[countryID][eventClass] = value
+
+									if participedIn:
+										participedData[countryID][eventClassKey].append("[[" + countryTitle + at + participedIn +"|" + str(year) + "]]")
+									else:
+										 participedData[countryID][eventClassKey].append(str(year))
+
+
+	count = count + 1
+
+
+wholeDataModuleObj = Page(site,tableModule + '/' + k)
+wholeDataModuleObj.text='return ' + luadata.serialize(v, encoding="utf-8", indent="\t")
+wholeDataModuleObj.save("test (using [[mw:Special:MyLanguage/Manual:Pywikibot|pywikibot]])")
+
+participedDataModuleObj = Page(site, wholeDataModule)
+participedDataModuleObj.text='return ' + luadata.serialize(participedData, encoding="utf-8", indent="\t")
+participedDataModuleObj.save("test (using [[mw:Special:MyLanguage/Manual:Pywikibot|pywikibot]])")
