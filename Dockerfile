@@ -1,5 +1,5 @@
 FROM amitie10g/pywikibot
 
-pip install luadata
+RUN pip install luadata
 
 COPY olympics.py /code
